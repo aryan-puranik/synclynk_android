@@ -1,7 +1,5 @@
 // src/hooks/useSocket.ts
-// Replaces useWebSocket.ts — works with the new socketService
-
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { socketService, EventName } from '../services/socket'
 
 type EventListener = (data: any) => void
@@ -11,28 +9,36 @@ export function useSocketEvent(
   event: EventName | EventName[],
   handler: EventListener
 ) {
-  // Store handler in ref so useEffect never re-runs due to handler changing
   const handlerRef = useRef(handler)
   useEffect(() => { handlerRef.current = handler }, [handler])
 
+  // Memoize events to fix the line 31 dependency error and prevent loops
+  const events = useMemo(() => 
+    (Array.isArray(event) ? event : [event]), 
+    [JSON.stringify(event)]
+  )
+
   useEffect(() => {
-    const events = Array.isArray(event) ? event : [event]
     const cleanups = events.map(e =>
       socketService.on(e, (data) => handlerRef.current(data))
     )
-    return () => cleanups.forEach(fn => fn())
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // Fix: Explicitly return void in the cleanup function
+    return () => { cleanups.forEach(fn => fn()) }
+  }, [events]) 
 }
 
 // ── Get reactive connection status ────────────────────────────────────────────
 export function useSocketStatus() {
   const [isConnected, setIsConnected] = useState(socketService.isConnected)
 
-  useEffect(()=> {
-    // Sync immediately in case status changed before mount
+  useEffect(() => {
     setIsConnected(socketService.isConnected)
-    const remove = socketService.addStatusListener(setIsConnected)
-    return remove
+    const removeListener = socketService.addStatusListener(setIsConnected)
+    
+    // Fix: Wrap the call to ensure the useEffect returns void, not boolean
+    return () => {
+      removeListener()
+    }
   }, [])
 
   return isConnected
@@ -45,17 +51,23 @@ export function useSocket(
 ) {
   const isConnected = useSocketStatus()
 
+  // Use the event hook logic if parameters are provided
+  const events = useMemo(() => {
+    if (!event) return []
+    return Array.isArray(event) ? event : [event]
+  }, [JSON.stringify(event)])
+
   const handlerRef = useRef(handler)
   useEffect(() => { handlerRef.current = handler }, [handler])
 
   useEffect(() => {
-    if (!event) return
-    const events = Array.isArray(event) ? event : [event]
+    if (events.length === 0 || !handler) return
+
     const cleanups = events.map(e =>
       socketService.on(e, (data) => handlerRef.current?.(data))
     )
-    return () => cleanups.forEach(fn => fn())
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    return () => { cleanups.forEach(fn => fn()) }
+  }, [events, !!handler])
 
   return {
     isConnected,

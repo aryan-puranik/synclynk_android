@@ -1,99 +1,82 @@
 // src/screens/StreamScreen.tsx
-// Camera streaming tab — placeholder for WebRTC build
-
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native'
+import { useState } from 'react'
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Alert } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
+import { RTCView } from 'react-native-webrtc'
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
-import { DashboardTabParams } from '../../App'
-import { useSocket } from '../hooks/useSocket'
-import { EVENTS } from '../services/socket'
+import { useWebRTC } from '../hooks/useWebRTC'
 
-type Props = BottomTabScreenProps<DashboardTabParams, 'Stream'>
-
-export default function StreamScreen({ route }: Props) {
+export default function StreamScreen({ route }: any) {
   const { roomId } = route.params
-  const { isConnected, emit } = useSocket()
+  const {
+    streamState, localStream, micEnabled, facing,
+    isStreaming, isRequesting, isConnected,
+    startStream, stopStream, toggleMic, switchCamera
+  } = useWebRTC(roomId)
 
-  const handleStartStream = () => {
-    emit(EVENTS.START_STREAM, { roomId })
-  }
+  const [showControls, setShowControls] = useState(true)
 
-  const handleStopStream = () => {
-    emit(EVENTS.STOP_STREAM, { roomId })
+  if (!isStreaming) {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.idleContainer}>
+          <View style={styles.placeholder}>
+            <Text style={styles.placeholderIcon}>{isRequesting ? '⏳' : '📷'}</Text>
+            <Text style={styles.placeholderText}>
+              {isRequesting ? 'Connecting to Web App...' : 'Ready to Stream'}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={[styles.startBtn, !isConnected && styles.disabled]} 
+            onPress={startStream}
+            disabled={!isConnected || isRequesting}
+          >
+            <Text style={styles.startBtnText}>{isRequesting ? 'Connecting...' : 'Start Streaming'}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    )
   }
 
   return (
-    <ScrollView style={{ backgroundColor: '#F0F7FF' }} contentContainerStyle={styles.container}>
-
-      <View style={styles.card}>
-        <Text style={styles.emoji}>📷</Text>
-        <Text style={styles.title}>Camera stream</Text>
-        <Text style={styles.sub}>
-          Stream your phone camera live to the web app using WebRTC peer-to-peer connection.
-        </Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Coming next</Text>
-        </View>
-      </View>
-
-      {/* Signal-only buttons — work now, video UI added in next phase */}
-      <View style={styles.actionCard}>
-        <Text style={styles.infoLabel}>Signal controls (active)</Text>
-        <View style={styles.btnRow}>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnStart, !isConnected && styles.disabled]}
-            onPress={handleStartStream}
-            disabled={!isConnected}
-          >
-            <Text style={styles.btnStartText}>▶ Start stream</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.btn, styles.btnStop, !isConnected && styles.disabled]}
-            onPress={handleStopStream}
-            disabled={!isConnected}
-          >
-            <Text style={styles.btnStopText}>■ Stop stream</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={styles.hint}>
-          These signals notify the web app — the camera feed is added in the next build phase with react-native-webrtc.
-        </Text>
-      </View>
-
-      <View style={styles.infoCard}>
-        <Text style={styles.infoLabel}>WebRTC setup plan</Text>
-        <Text style={styles.infoText}>
-          • Install react-native-webrtc{'\n'}
-          • Build a custom Expo dev client (required){'\n'}
-          • Phone opens camera → creates WebRTC offer{'\n'}
-          • Server relays offer/answer/ICE via existing socket{'\n'}
-          • Web app displays peer video stream
-        </Text>
-      </View>
-
-    </ScrollView>
+    <View style={styles.streamRoot}>
+      <StatusBar hidden />
+      {localStream && (
+        <RTCView
+          streamURL={localStream.toURL()}
+          style={styles.rtcView}
+          objectFit="cover"
+          mirror={facing === 'front'}
+          onTouchStart={() => setShowControls(!showControls)}
+        />
+      )}
+      {showControls && (
+        <SafeAreaView style={styles.bottomBar}>
+          <View style={styles.controls}>
+            <TouchableOpacity onPress={toggleMic}><Text style={styles.ctrlIcon}>{micEnabled ? '🎙' : '🔇'}</Text></TouchableOpacity>
+            <TouchableOpacity style={styles.stopBtn} onPress={stopStream}><View style={styles.stopIcon} /></TouchableOpacity>
+            <TouchableOpacity onPress={switchCamera}><Text style={styles.ctrlIcon}>🔄</Text></TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      )}
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container:  { padding: 20, gap: 16, paddingBottom: 40, alignItems: 'center' },
-  card:       { backgroundColor: '#fff', borderRadius: 16, padding: 28, alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#D8E8F8', width: '100%' },
-  emoji:      { fontSize: 48 },
-  title:      { fontSize: 18, fontWeight: '600', color: '#1A3A5C' },
-  sub:        { fontSize: 14, color: '#5A7FA8', textAlign: 'center', lineHeight: 22 },
-  badge:      { backgroundColor: '#E3F2FD', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 5, marginTop: 4 },
-  badgeText:  { fontSize: 12, color: '#1565C0', fontWeight: '600' },
-
-  actionCard: { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#D8E8F8', width: '100%', gap: 12 },
-  infoLabel:  { fontSize: 11, color: '#8AAAC8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
-  btnRow:     { flexDirection: 'row', gap: 10 },
-  btn:        { flex: 1, borderRadius: 10, padding: 13, alignItems: 'center' },
-  btnStart:   { backgroundColor: '#E8F5E9', borderWidth: 1, borderColor: '#A5D6A7' },
-  btnStop:    { backgroundColor: '#FFEBEE', borderWidth: 1, borderColor: '#FFCDD2' },
-  btnStartText:{ color: '#2E7D32', fontWeight: '600', fontSize: 14 },
-  btnStopText: { color: '#C62828', fontWeight: '600', fontSize: 14 },
-  disabled:   { opacity: 0.4 },
-  hint:       { fontSize: 12, color: '#8AAAC8', lineHeight: 18 },
-
-  infoCard:   { backgroundColor: '#fff', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: '#D8E8F8', width: '100%' },
-  infoText:   { fontSize: 13, color: '#2A4A6A', lineHeight: 24, marginTop: 8 },
+  safeArea: { flex: 1, backgroundColor: '#F0F7FF' },
+  idleContainer: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' },
+  placeholder: { width: '100%', aspectRatio: 16/9, backgroundColor: '#1A2A3A', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
+  placeholderIcon: { fontSize: 48 },
+  placeholderText: { color: '#7AAAC8', marginTop: 12 },
+  startBtn: { width: '100%', backgroundColor: '#1A6FD4', padding: 18, borderRadius: 12, marginTop: 24, alignItems: 'center' },
+  startBtnText: { color: '#fff', fontWeight: 'bold' },
+  disabled: { opacity: 0.5 },
+  streamRoot: { flex: 1, backgroundColor: '#000' },
+  rtcView: { flex: 1 },
+  bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)' },
+  controls: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', padding: 20 },
+  ctrlIcon: { fontSize: 24, color: '#fff' },
+  stopBtn: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  stopIcon: { width: 24, height: 24, backgroundColor: '#E24B4A', borderRadius: 4 }
 })

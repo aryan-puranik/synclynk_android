@@ -1,5 +1,4 @@
 // src/services/socket.ts
-
 import { io, Socket } from 'socket.io-client'
 
 export const EVENTS = {
@@ -25,14 +24,15 @@ export const EVENTS = {
   CLIPBOARD_STATUS:           'clipboard-status',
   CLIPBOARD_STATUS_RESPONSE:  'clipboard-status-response',
 
-  // WebRTC
-  START_STREAM:   'start-stream',
-  STOP_STREAM:    'stop-stream',
-  STREAM_STARTED: 'stream-started',
-  STREAM_STOPPED: 'stream-stopped',
-  WEBRTC_OFFER:   'webrtc-offer',
-  WEBRTC_ANSWER:  'webrtc-answer',
-  WEBRTC_ICE:     'webrtc-ice-candidate',
+  // WebRTC & Streaming
+  START_STREAM:           'start-stream',
+  STOP_STREAM:            'stop-stream',
+  STREAM_STARTED:         'stream-started',
+  STREAM_STOPPED:         'stream-stopped',
+  WEBRTC_OFFER:           'webrtc-offer',
+  WEBRTC_ANSWER:          'webrtc-answer',
+  WEBRTC_ICE:             'webrtc-ice-candidate',
+  REQUEST_MOBILE_STREAM:  'request-mobile-stream', // ADDED TO FIX TYPE ERROR
 
   // Notifications
   NOTIFICATION:          'notification',
@@ -90,7 +90,11 @@ class SocketService {
       console.log('[Socket] Connected:', this.socket?.id)
       this._notifyStatus(true)
       this.socket?.emit(EVENTS.REGISTER_DEVICE, { deviceId: this.mobileDeviceId, deviceType: 'mobile' })
-      this.socket?.emit(EVENTS.PAIR_WITH_CODE,   { pairingCode, deviceId: this.mobileDeviceId })
+      
+      // Delay to ensure server has processed device registration before pairing
+      setTimeout(() => {
+        this.socket?.emit(EVENTS.PAIR_WITH_CODE, { pairingCode, deviceId: this.mobileDeviceId })
+      }, 500)
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -109,7 +113,7 @@ class SocketService {
 
     this.socket.on(EVENTS.PAIRED_SUCCESS, ({ roomId }: { roomId: string }) => {
       this.roomId = roomId
-      console.log('[Socket] Paired — roomId:', roomId)
+      console.log('[Socket] Paired successfully in room:', roomId)
     })
 
     this.socket.on(EVENTS.PAIRED, ({ roomId }: { roomId: string }) => {
@@ -142,12 +146,16 @@ class SocketService {
   on(event: EventName, fn: EventListener) {
     if (!this.eventListeners.has(event)) this.eventListeners.set(event, new Set())
     this.eventListeners.get(event)!.add(fn)
-    return () => this.eventListeners.get(event)?.delete(fn)
+    return () => {
+      this.eventListeners.get(event)?.delete(fn)
+    }
   }
 
   addStatusListener(fn: StatusListener) {
     this.statusListeners.add(fn)
-    return () => this.statusListeners.delete(fn)
+    return () => {
+      this.statusListeners.delete(fn)
+    }
   }
 
   get isConnected() { return this.socket?.connected ?? false }
