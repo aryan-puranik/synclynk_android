@@ -59,8 +59,11 @@ class NotificationService {
   private permListeners  = new Set<PermListener>()
   private _history:        MirroredNotification[] = []
   private _isListening     = false
+  private lastNotificationHash: string ='';
 
   permissionStatus: PermissionStatus = 'unknown'
+
+  
 
   // ── Check Notification Access permission ──────────────────────────────────
   async checkPermission(): Promise<PermissionStatus> {
@@ -124,34 +127,37 @@ class NotificationService {
 
   // ── Handle raw notification from headless task ────────────────────────────
   private _handleRaw(raw: RawNotification): void {
-    const roomId = socketService.roomId
+    const roomId = socketService.roomId;
 
-    // Skip our own app's notifications to prevent echo
-    if (raw.app?.includes('synclynk')) return
-    if (!raw.app) return
+    if (raw.app?.includes('synclynk')) return;
+    if (!raw.app) return;
+
+    // ─── NEW: Deduplication Logic ───
+    // Create a unique string based on content rather than time
+    const contentHash = `${raw.app}|${raw.title}|${raw.text}|${raw.bigText}`;
+    
+    // If the content is exactly the same as the last one, skip it
+    if (contentHash === this.lastNotificationHash) {
+      return; 
+    }
+    this.lastNotificationHash = contentHash;
+    // ────────────────────────────────
 
     const notif: MirroredNotification = {
-      id:        `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      // Use a hash of the content for the ID so the web app can also deduplicate
+      id: `${raw.app}-${Date.now()}`, 
       app:       raw.app,
       appName:   getAppName(raw.app),
       title:     raw.title      || raw.titleBig || '',
       body:      raw.bigText    || raw.text     || raw.subText || '',
       timestamp: raw.time ? parseInt(raw.time, 10) : Date.now(),
-    }
+    };
 
-    // Add to history (keep last 50)
-    this._history = [notif, ...this._history].slice(0, 50)
+    this._history = [notif, ...this._history].slice(0, 50);
+    this.notifListeners.forEach(fn => fn(notif));
 
-    // Notify React UI
-    this.notifListeners.forEach(fn => fn(notif))
-
-    // Relay to webapp if connected
     if (roomId && socketService.isConnected) {
-      socketService.emit(EVENTS.NOTIFICATION, {
-        roomId,
-        notification: notif,
-      })
-      console.log(`[Notif] Relayed: ${notif.appName} — ${notif.title}`)
+      socketService.emit(EVENTS.NOTIFICATION, { roomId, notification: notif });
     }
   }
 }
