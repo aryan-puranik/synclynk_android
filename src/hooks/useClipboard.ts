@@ -8,6 +8,16 @@ import { mobileClipboardService, ClipboardData, ClipboardStatus } from '../servi
 import { socketService } from '../services/socket'
 import { useSocketStatus } from './useSocket'
 
+// Helper function to ensure history has unique IDs
+const deduplicateHistory = (history: ClipboardData[]) => {
+  const seen = new Set();
+  return history.filter(item => {
+    const duplicate = seen.has(item.id);
+    seen.add(item.id);
+    return !duplicate;
+  });
+};
+
 export function useClipboard() {
   const isConnected = useSocketStatus()
   const roomId      = socketService.roomId
@@ -30,7 +40,9 @@ export function useClipboard() {
       // New content arrived from webapp — auto-written to phone clipboard by service
       mobileClipboardService.on('sync', (data: ClipboardData) => {
         setClipboard(data)
-        setClipboardHistory(mobileClipboardService.getHistoryList())
+        // DEDUPLICATE HERE
+        const rawHistory = mobileClipboardService.getHistoryList();
+        setClipboardHistory(deduplicateHistory(rawHistory));
         setLastEvent(
           data.type === 'text'
             ? `📋 Received: "${data.fullContent?.slice(0, 60)}"`
@@ -42,14 +54,16 @@ export function useClipboard() {
       // Server confirmed our send
       mobileClipboardService.on('updated', (data: ClipboardData) => {
         setClipboard(data)
-        setClipboardHistory(mobileClipboardService.getHistoryList())
+        // DEDUPLICATE HERE
+        const rawHistory = mobileClipboardService.getHistoryList();
+        setClipboardHistory(deduplicateHistory(rawHistory));
         setLastEvent(`✅ Sent to web app: "${data.fullContent?.slice(0, 60)}"`)
       }),
 
       // History loaded
       mobileClipboardService.on('history', (history: ClipboardData[]) => {
-        setClipboardHistory(history)
-        setIsLoading(false)
+        setClipboardHistory(deduplicateHistory(history));
+        setIsLoading(false);
       }),
 
       // Status loaded

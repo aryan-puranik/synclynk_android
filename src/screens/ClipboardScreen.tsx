@@ -1,34 +1,33 @@
 // src/screens/ClipboardScreen.tsx
 import { useState, useCallback } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ActivityIndicator,
-  KeyboardAvoidingView, Platform, ScrollView,
+  View, Text, TouchableOpacity,
+  StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert
 } from 'react-native'
 import { useClipboard } from '../hooks/useClipboard'
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { DashboardTabParams } from '../../App'
-import { useSafeAreaInsets } from 'react-native-safe-area-context' // [ADDED]
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 type Props = BottomTabScreenProps<DashboardTabParams, 'Clipboard'>
 
 export default function ClipboardScreen(_: Props) {
-  const insets = useSafeAreaInsets() // [ADDED]
+  const insets = useSafeAreaInsets()
   const {
-    clipboard, clipboardHistory, isLoading,
-    lastEvent, isConnected,
-    updateClipboard, sendPhoneClipboard,
-    requestClipboard, clearClipboard,
-    copyToPhone, getClipboardHistory,
+    clipboard, clipboardHistory, isConnected, lastEvent,
+    requestClipboard, clearClipboard, copyToPhone, getClipboardHistory,
   } = useClipboard()
 
-  const [manualText, setManualText] = useState('')
-
-  const handleSendManual = useCallback(async () => {
-    if (!manualText.trim()) return
-    const ok = await updateClipboard('text', manualText.trim())
-    if (ok) setManualText('')
-  }, [manualText, updateClipboard])
+  const handleClearHistory = useCallback(() => {
+    Alert.alert(
+      "Clear History",
+      "Are you sure you want to clear all clipboard history from the server?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Clear All", style: "destructive", onPress: () => clearClipboard() }
+      ]
+    );
+  }, [clearClipboard]);
 
   const formatTime = (ts: number) => {
     const d = new Date(ts)
@@ -44,10 +43,9 @@ export default function ClipboardScreen(_: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView 
-        /* [UPDATED] Applied safe area to paddingBottom */
         contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 40 }]}
       >
-
+        {/* Connection Status */}
         <View style={styles.statusRow}>
           <View style={[styles.dot, isConnected ? styles.dotOn : styles.dotOff]} />
           <Text style={styles.statusText}>
@@ -55,11 +53,13 @@ export default function ClipboardScreen(_: Props) {
           </Text>
         </View>
 
+        {/* Activity Log */}
         <View style={styles.eventCard}>
           <Text style={styles.sectionLabel}>Last activity</Text>
           <Text style={styles.eventText}>{lastEvent}</Text>
         </View>
 
+        {/* Current Clipboard Item */}
         {clipboard && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
@@ -76,45 +76,11 @@ export default function ClipboardScreen(_: Props) {
               >
                 <Text style={styles.chipBtnText}>Copy to phone</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.chipBtn, styles.chipBtnDanger]} onPress={clearClipboard}>
-                <Text style={[styles.chipBtnText, { color: '#E24B4A' }]}>Clear</Text>
-              </TouchableOpacity>
             </View>
           </View>
         )}
 
-        <View style={styles.card}>
-          <Text style={styles.sectionLabel}>Send text to web app</Text>
-          <TextInput
-            style={styles.input}
-            value={manualText}
-            onChangeText={setManualText}
-            placeholder="Type or paste text here…"
-            placeholderTextColor="#8AAAC8"
-            multiline
-            numberOfLines={3}
-          />
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={[styles.actionBtn, { flex: 1 }]}
-              onPress={handleSendManual}
-              disabled={!manualText.trim() || !isConnected}
-            >
-              <Text style={styles.actionBtnText}>Send typed text</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionBtn, { flex: 1 }]}
-              onPress={sendPhoneClipboard}
-              disabled={isConnected}
-            >
-              {isLoading
-                ? <ActivityIndicator color="#1565C0" size="small" />
-                : <Text style={styles.actionBtnText}>Send phone clipboard</Text>
-              }
-            </TouchableOpacity>
-          </View>
-        </View>
-
+        {/* Quick Sync Controls */}
         <View style={styles.quickRow}>
           <TouchableOpacity
             style={[styles.quickBtn, !isConnected && styles.disabled]}
@@ -132,12 +98,19 @@ export default function ClipboardScreen(_: Props) {
           </TouchableOpacity>
         </View>
 
+        {/* History List */}
         {clipboardHistory.length > 0 && (
           <View style={styles.card}>
-            <Text style={styles.sectionLabel}>History ({clipboardHistory.length})</Text>
+            <View style={styles.historyHeader}>
+              <Text style={styles.sectionLabel}>History ({clipboardHistory.length})</Text>
+              <TouchableOpacity onPress={handleClearHistory}>
+                <Text style={styles.clearAllText}>Clear All</Text>
+              </TouchableOpacity>
+            </View>
+            
             {clipboardHistory.map((item, i) => (
               <TouchableOpacity
-                key={item.id || i}
+                key={`hist-${item.id}-${i}`}
                 style={styles.historyItem}
                 onPress={() => copyToPhone(item.fullContent || item.content)}
               >
@@ -175,20 +148,13 @@ const styles = StyleSheet.create({
   clipContent:  { fontSize: 14, color: '#1A3A5C', lineHeight: 22 },
   cardActions:  { flexDirection: 'row', gap: 8 },
   chipBtn:      { borderWidth: 1, borderColor: '#90CAF9', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 7 },
-  chipBtnDanger:{ borderColor: '#E24B4A' },
   chipBtnText:  { fontSize: 12, color: '#1565C0', fontWeight: '500' },
-  input: {
-    borderWidth: 1, borderColor: '#D8E8F8', borderRadius: 10,
-    padding: 12, fontSize: 14, color: '#1A3A5C',
-    minHeight: 80, textAlignVertical: 'top',
-    backgroundColor: '#F8FBFF',
-  },
-  actionBtn:     { backgroundColor: '#E3F2FD', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#90CAF9' },
-  actionBtnText: { color: '#1565C0', fontWeight: '500', fontSize: 13 },
-  quickRow: { flexDirection: 'row', gap: 10 },
-  quickBtn: { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#D8E8F8' },
+  quickRow:     { flexDirection: 'row', gap: 10 },
+  quickBtn:     { flex: 1, backgroundColor: '#fff', borderRadius: 10, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#D8E8F8' },
   quickBtnText: { fontSize: 13, color: '#1A6FD4', fontWeight: '500' },
-  disabled: { opacity: 0.4 },
+  disabled:     { opacity: 0.4 },
+  historyHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+  clearAllText:  { fontSize: 11, color: '#E24B4A', fontWeight: '600', textTransform: 'uppercase' },
   historyItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: '#F0F7FF', gap: 8 },
   historyLeft: { flex: 1 },
   historyText: { fontSize: 13, color: '#2A4A6A' },

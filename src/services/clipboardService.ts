@@ -8,19 +8,19 @@ import { socketService, EVENTS } from './socket'
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 export interface ClipboardData {
-  id:          string
-  type:        'text' | 'image'
-  content:     string       // preview (truncated for images)
+  id: string
+  type: 'text' | 'image'
+  content: string       // preview (truncated for images)
   fullContent: string       // full content
-  deviceId:    string
-  timestamp:   number
-  size:        number
+  deviceId: string
+  timestamp: number
+  size: number
 }
 
 export interface ClipboardStatus {
-  hasContent:  boolean
+  hasContent: boolean
   lastUpdated: number | null
-  type:        string | null
+  type: string | null
   historyCount: number
 }
 
@@ -37,11 +37,11 @@ type Listener = (data?: any) => void
 
 // ─── SERVICE ──────────────────────────────────────────────────────────────────
 class MobileClipboardService {
-  private listeners    = new Map<ClipboardEvent, Set<Listener>>()
-  private lastSynced   = ''         // avoid echo-sending what we just received
+  private listeners = new Map<ClipboardEvent, Set<Listener>>()
+  private lastSynced = ''         // avoid echo-sending what we just received
   private monitorTimer: any = null  // polling interval for auto-sync
   clipboardData: ClipboardData | null = null
-  history:       ClipboardData[]      = []
+  history: ClipboardData[] = []
 
   constructor() {
     this._setupSocketListeners()
@@ -58,7 +58,7 @@ class MobileClipboardService {
       // Auto-write to phone clipboard so user can paste immediately
       if (data.type === 'text' && data.fullContent) {
         this.lastSynced = data.fullContent
-        ExpoClipboard.setStringAsync(data.fullContent).catch(() => {})
+        ExpoClipboard.setStringAsync(data.fullContent).catch(() => { })
       }
     })
 
@@ -73,9 +73,14 @@ class MobileClipboardService {
 
     // History response
     socketService.on(EVENTS.CLIPBOARD_HISTORY_RESPONSE, (history: ClipboardData[]) => {
-      this.history = history
-      this._emit('history', history)
-    })
+      // Use a Map or filter to ensure the incoming history has no duplicate IDs
+      const uniqueHistory = history.filter((item, index, self) =>
+        index === self.findIndex((t) => t.id === item.id)
+      );
+
+      this.history = uniqueHistory;
+      this._emit('history', uniqueHistory);
+    });
 
     // Status response
     socketService.on(EVENTS.CLIPBOARD_STATUS_RESPONSE, (status: ClipboardStatus) => {
@@ -84,9 +89,10 @@ class MobileClipboardService {
 
     // Cleared
     socketService.on(EVENTS.CLIPBOARD_CLEARED, () => {
-      this.clipboardData = null
-      this._emit('cleared')
-    })
+    this.clipboardData = null; // Clears current
+    this.history = [];         // ADD THIS: Clears local history list
+    this._emit('cleared');     // Notifies components
+  });
 
     // Empty
     socketService.on(EVENTS.CLIPBOARD_EMPTY, () => {
@@ -186,7 +192,7 @@ class MobileClipboardService {
   }
 
   getCurrentClipboard() { return this.clipboardData }
-  getHistoryList()      { return this.history }
+  getHistoryList() { return this.history }
 
   // ── Event emitter ─────────────────────────────────────────────────────────
   on(event: ClipboardEvent, fn: Listener) {
@@ -204,7 +210,17 @@ class MobileClipboardService {
   }
 
   private _addToHistory(data: ClipboardData) {
-    this.history = [data, ...this.history].slice(0, 50)
+    // 1. Check if the ID already exists in the current local history
+    const isDuplicate = this.history.some(item => item.id === data.id);
+
+    // 2. Only add if it's a truly new unique ID
+    if (!isDuplicate) {
+      this.history = [data, ...this.history].slice(0, 50);
+    } else {
+      // 3. Optional: If it exists, update the timestamp/content in case it changed 
+      // but keep the same ID to prevent key errors
+      this.history = this.history.map(item => item.id === data.id ? data : item);
+    }
   }
 }
 
