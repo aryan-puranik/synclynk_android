@@ -1,13 +1,11 @@
 // src/screens/OverviewScreen.tsx
-// The "home" tab shown right after pairing
-// Replaces the old DashboardScreen — disconnect moved to header button in App.tsx
-
 import { useCallback, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native'
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { DashboardTabParams } from '../../App'
 import { useSocket, useSocketEvent } from '../hooks/useSocket'
 import { EVENTS } from '../services/socket'
+import { useSafeAreaInsets } from 'react-native-safe-area-context' // Import safe area hook
 
 type Props = BottomTabScreenProps<DashboardTabParams, 'Overview'>
 
@@ -22,6 +20,7 @@ export default function OverviewScreen({ route, navigation }: Props) {
   const { roomId } = route.params
   const { isConnected } = useSocket()
   const [events, setEvents] = useState<string[]>(['Session started'])
+  const insets = useSafeAreaInsets() // Get system insets
 
   const addEvent = useCallback((msg: string) => {
     setEvents(prev => [msg, ...prev].slice(0, 8))
@@ -52,7 +51,13 @@ export default function OverviewScreen({ route, navigation }: Props) {
   }, [addEvent]))
 
   return (
-    <ScrollView style={{ backgroundColor: '#F0F7FF' }} contentContainerStyle={styles.container}>
+    <ScrollView 
+      style={{ backgroundColor: '#F0F7FF' }} 
+      contentContainerStyle={[
+        styles.container, 
+        { paddingBottom: insets.bottom + 30 } // Add safe area to bottom padding
+      ]}
+    >
 
       {/* Status card */}
       <View style={styles.statusCard}>

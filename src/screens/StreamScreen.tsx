@@ -1,13 +1,13 @@
 // src/screens/StreamScreen.tsx
 import { useState } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, StatusBar, Alert } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { View, Text, StyleSheet, TouchableOpacity, StatusBar } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context' // [UPDATED] Use hook for granular control
 import { RTCView } from 'react-native-webrtc'
-import { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { useWebRTC } from '../hooks/useWebRTC'
 
 export default function StreamScreen({ route }: any) {
   const { roomId } = route.params
+  const insets = useSafeAreaInsets() // [ADDED]
   const {
     streamState, localStream, micEnabled, facing,
     isStreaming, isRequesting, isConnected,
@@ -18,23 +18,21 @@ export default function StreamScreen({ route }: any) {
 
   if (!isStreaming) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <View style={styles.idleContainer}>
-          <View style={styles.placeholder}>
-            <Text style={styles.placeholderIcon}>{isRequesting ? '⏳' : '📷'}</Text>
-            <Text style={styles.placeholderText}>
-              {isRequesting ? 'Connecting to Web App...' : 'Ready to Stream'}
-            </Text>
-          </View>
-          <TouchableOpacity 
-            style={[styles.startBtn, !isConnected && styles.disabled]} 
-            onPress={startStream}
-            disabled={!isConnected || isRequesting}
-          >
-            <Text style={styles.startBtnText}>{isRequesting ? 'Connecting...' : 'Start Streaming'}</Text>
-          </TouchableOpacity>
+      <View style={[styles.idleContainer, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.placeholder}>
+          <Text style={styles.placeholderIcon}>{isRequesting ? '⌛' : '📷'}</Text>
+          <Text style={styles.placeholderText}>
+            {isRequesting ? 'Connecting to Web App...' : 'Ready to Stream'}
+          </Text>
         </View>
-      </SafeAreaView>
+        <TouchableOpacity 
+          style={[styles.startBtn, !isConnected && styles.disabled]} 
+          onPress={startStream}
+          disabled={!isConnected || isRequesting}
+        >
+          <Text style={styles.startBtnText}>{isRequesting ? 'Connecting...' : 'Start Streaming'}</Text>
+        </TouchableOpacity>
+      </View>
     )
   }
 
@@ -51,21 +49,21 @@ export default function StreamScreen({ route }: any) {
         />
       )}
       {showControls && (
-        <SafeAreaView style={styles.bottomBar}>
+        /* [UPDATED] Use View + insets for the bottom bar instead of a generic SafeAreaView */
+        <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
           <View style={styles.controls}>
-            <TouchableOpacity onPress={toggleMic}><Text style={styles.ctrlIcon}>{micEnabled ? '🎙' : '🔇'}</Text></TouchableOpacity>
+            <TouchableOpacity onPress={toggleMic}><Text style={styles.ctrlIcon}>{micEnabled ? '🎙️' : '🔇'}</Text></TouchableOpacity>
             <TouchableOpacity style={styles.stopBtn} onPress={stopStream}><View style={styles.stopIcon} /></TouchableOpacity>
             <TouchableOpacity onPress={switchCamera}><Text style={styles.ctrlIcon}>🔄</Text></TouchableOpacity>
           </View>
-        </SafeAreaView>
+        </View>
       )}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F0F7FF' },
-  idleContainer: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center' },
+  idleContainer: { flex: 1, padding: 20, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F0F7FF' },
   placeholder: { width: '100%', aspectRatio: 16/9, backgroundColor: '#1A2A3A', borderRadius: 16, justifyContent: 'center', alignItems: 'center' },
   placeholderIcon: { fontSize: 48 },
   placeholderText: { color: '#7AAAC8', marginTop: 12 },

@@ -1,18 +1,17 @@
 // src/screens/NotificationsScreen.tsx
-
 import { useCallback } from 'react'
 import {
   View, Text, StyleSheet,
-  TouchableOpacity, FlatList, SafeAreaView,
+  TouchableOpacity, FlatList,
 } from 'react-native'
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs'
 import { DashboardTabParams } from '../../App'
 import { useNotifications } from '../hooks/useNotifications'
 import { MirroredNotification } from '../services/notificationService'
+import { useSafeAreaInsets } from 'react-native-safe-area-context' // [ADDED]
 
 type Props = BottomTabScreenProps<DashboardTabParams, 'Notifications'>
 
-// ─── Colour per app name ──────────────────────────────────────────────────────
 const PALETTE = ['#1A6FD4','#0F6E56','#BA7517','#534AB7','#C62828','#0F5298']
 function appColour(name: string): string {
   let h = 0
@@ -20,7 +19,6 @@ function appColour(name: string): string {
   return PALETTE[h % PALETTE.length]
 }
 
-// ─── Format timestamp ─────────────────────────────────────────────────────────
 function fmt(ts: number): string {
   const diff = Date.now() - ts
   if (diff < 60_000)   return 'just now'
@@ -31,7 +29,6 @@ function fmt(ts: number): string {
   return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 
-// ─── Single row ───────────────────────────────────────────────────────────────
 function NotifRow({ item }: { item: MirroredNotification }) {
   const colour = appColour(item.appName)
   return (
@@ -59,8 +56,8 @@ function NotifRow({ item }: { item: MirroredNotification }) {
   )
 }
 
-// ─── SCREEN ───────────────────────────────────────────────────────────────────
 export default function NotificationsScreen(_: Props) {
+  const insets = useSafeAreaInsets() // [ADDED]
   const {
     permission, isListening, notifications,
     isConnected, hasPermission,
@@ -68,12 +65,11 @@ export default function NotificationsScreen(_: Props) {
     toggleListening, clearHistory,
   } = useNotifications()
 
-  // ── NO PERMISSION ──────────────────────────────────────────────────────────
   if (!hasPermission) {
     return (
-      <SafeAreaView style={styles.safe}>
+      /* [UPDATED] Permission screen padding */
+      <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom + 20 }]}>
         <View style={styles.permContainer}>
-
           <View style={styles.permCard}>
             <Text style={styles.permEmoji}>🔔</Text>
             <Text style={styles.permTitle}>Notification access needed</Text>
@@ -81,11 +77,9 @@ export default function NotificationsScreen(_: Props) {
               Synclynk needs Notification Access to read your phone's notifications
               and mirror them to your web app in real-time.
             </Text>
-
             <TouchableOpacity style={styles.permBtn} onPress={openSettings}>
               <Text style={styles.permBtnText}>Open Notification Access Settings</Text>
             </TouchableOpacity>
-
             <TouchableOpacity style={styles.recheckBtn} onPress={recheckPermission}>
               <Text style={styles.recheckText}>
                 {permission === 'unknown'
@@ -94,7 +88,6 @@ export default function NotificationsScreen(_: Props) {
               </Text>
             </TouchableOpacity>
           </View>
-
           <View style={styles.stepsCard}>
             <Text style={styles.stepsLabel}>How to grant access</Text>
             {[
@@ -111,17 +104,14 @@ export default function NotificationsScreen(_: Props) {
               </View>
             ))}
           </View>
-
         </View>
-      </SafeAreaView>
+      </View>
     )
   }
 
-  // ── PERMISSION GRANTED ─────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={styles.safe}>
-
-      {/* Status bar */}
+    /* [UPDATED] Main container padding */
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
       <View style={styles.bar}>
         <View style={styles.barLeft}>
           <View style={[
@@ -155,7 +145,6 @@ export default function NotificationsScreen(_: Props) {
         </View>
       </View>
 
-      {/* Feed */}
       {notifications.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.emptyIcon}>{isListening ? '👂' : '⏸'}</Text>
@@ -173,23 +162,20 @@ export default function NotificationsScreen(_: Props) {
           data={notifications}
           keyExtractor={item => item.id}
           renderItem={({ item }) => <NotifRow item={item} />}
-          contentContainerStyle={styles.list}
+          /* [UPDATED] Added safe area to list padding */
+          contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 40 }]}
           ItemSeparatorComponent={() => <View style={styles.sep} />}
           ListHeaderComponent={() => (
             <Text style={styles.feedLabel}>Recent notifications</Text>
           )}
         />
       )}
-
-    </SafeAreaView>
+    </View>
   )
 }
 
-// ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#F0F7FF' },
-
-  // Permission screen
   permContainer: { flex: 1, padding: 20, gap: 16 },
   permCard:      { backgroundColor: '#fff', borderRadius: 16, padding: 24, alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#D8E8F8' },
   permEmoji:     { fontSize: 48 },
@@ -205,8 +191,6 @@ const styles = StyleSheet.create({
   stepBubble:    { width: 24, height: 24, borderRadius: 12, backgroundColor: '#E3F2FD', alignItems: 'center', justifyContent: 'center' },
   stepNum:       { fontSize: 12, fontWeight: '700', color: '#1565C0' },
   stepText:      { fontSize: 13, color: '#2A4A6A', flex: 1, lineHeight: 20 },
-
-  // Main screen
   bar:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 11, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#D8E8F8' },
   barLeft:       { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   barRight:      { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -221,19 +205,13 @@ const styles = StyleSheet.create({
   toggleTextOn:  { color: '#2E7D32' },
   clearBtn:      { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: '#FFCDD2', backgroundColor: '#FFEBEE' },
   clearText:     { fontSize: 12, color: '#C62828', fontWeight: '500' },
-
-  // Empty
   empty:      { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40, gap: 12 },
   emptyIcon:  { fontSize: 52 },
   emptyTitle: { fontSize: 17, fontWeight: '600', color: '#1A3A5C', textAlign: 'center' },
   emptySub:   { fontSize: 13, color: '#8AAAC8', textAlign: 'center', lineHeight: 22 },
-
-  // List
-  list:      { paddingHorizontal: 12, paddingBottom: 40 },
+  list:      { paddingHorizontal: 12 },
   feedLabel: { fontSize: 11, color: '#8AAAC8', fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, paddingVertical: 12, paddingHorizontal: 4 },
   sep:       { height: 1, backgroundColor: '#EEF5FF', marginLeft: 56 },
-
-  // Row
   row:        { flexDirection: 'row', alignItems: 'flex-start', padding: 12, backgroundColor: '#fff', borderRadius: 12, gap: 12, marginBottom: 2 },
   icon:       { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', borderWidth: 1, flexShrink: 0 },
   iconText:   { fontSize: 18, fontWeight: '700' },

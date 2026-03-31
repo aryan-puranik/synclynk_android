@@ -1,9 +1,10 @@
 // App.tsx
-
+import React from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { TouchableOpacity, Text, StyleSheet } from 'react-native'
+import { TouchableOpacity, Text, StyleSheet, StatusBar } from 'react-native'
+import { SafeAreaProvider } from 'react-native-safe-area-context' 
 
 import HomeScreen         from './src/screens/HomeScreen'
 import QRScanScreen       from './src/screens/QRScanScreen'
@@ -110,33 +111,39 @@ function DashboardTabs({ route, navigation }: any) {
 // ─── ROOT STACK ───────────────────────────────────────────────────────────────
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator
-        initialRouteName="Home"
-        screenOptions={{
-          headerStyle:      { backgroundColor: '#F0F7FF' },
-          headerTintColor:  '#0A4A8F',
-          headerTitleStyle: { fontWeight: '600' } as any,
-        }}
-      >
-        <Stack.Screen
-          name="Home"
-          component={HomeScreen}
-          options={{ title: 'Synclynk' }}
-        />
-        <Stack.Screen
-          name="QRScan"
-          component={QRScanScreen}
-          options={{ title: 'Scan QR Code' }}
-        />
-        {/* headerShown:false — each tab manages its own header */}
-        <Stack.Screen
-          name="Dashboard"
-          component={DashboardTabs}
-          options={{ headerShown: false }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    /* [UPDATED] Wrapped the root in SafeAreaProvider for Synclynk */
+    <SafeAreaProvider>
+      {/* Configure StatusBar to match your theme background color */}
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F7FF" />
+      
+      <NavigationContainer>
+        <Stack.Navigator
+          initialRouteName="Home"
+          screenOptions={{
+            headerStyle:      { backgroundColor: '#F0F7FF' },
+            headerTintColor:  '#0A4A8F',
+            headerTitleStyle: { fontWeight: '600' } as any,
+          }}
+        >
+          <Stack.Screen
+            name="Home"
+            component={HomeScreen}
+            options={{ title: 'Synclynk' }}
+          />
+          <Stack.Screen
+            name="QRScan"
+            component={QRScanScreen}
+            options={{ title: 'Scan QR Code' }}
+          />
+          {/* headerShown:false — each tab manages its own header */}
+          <Stack.Screen
+            name="Dashboard"
+            component={DashboardTabs}
+            options={{ headerShown: false }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   )
 }
 
@@ -146,6 +153,10 @@ const styles = StyleSheet.create({
     borderTopColor:  '#D8E8F8',
     borderTopWidth:  1,
     paddingTop:      6,
+    /* NOTE: We keep your padding/height, but because of the SafeAreaProvider,
+      React Navigation will now automatically handle extra padding for the 
+      Home Indicator on iOS and Gesture Bars on Android.
+    */
     paddingBottom:   8,
     height:          62,
   },

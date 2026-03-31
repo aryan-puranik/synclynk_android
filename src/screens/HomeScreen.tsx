@@ -1,17 +1,21 @@
-// src/screens/HomeScreen.tsx — updated for socket.io
-
+// src/screens/HomeScreen.tsx — updated for socket.io and safe area
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack'
 import { RootStackParams } from '../../App'
 import { useSocketStatus } from '../hooks/useSocket'
+import { useSafeAreaInsets } from 'react-native-safe-area-context' // Import safe area hook
 
 type Props = NativeStackScreenProps<RootStackParams, 'Home'>
 
 export default function HomeScreen({ navigation }: Props) {
   const isConnected = useSocketStatus()
+  const insets = useSafeAreaInsets() // Get system insets
 
   return (
-    <View style={styles.container}>
+    <View style={[
+      styles.container, 
+      { paddingBottom: Math.max(insets.bottom, 32) } // Apply dynamic bottom padding
+    ]}>
 
       <View style={styles.brand}>
         <Text style={styles.logo}>Synclynk</Text>
