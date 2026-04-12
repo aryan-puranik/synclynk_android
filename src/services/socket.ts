@@ -79,7 +79,7 @@ class SocketService {
     console.log('[Socket] Connecting to server:', server)
 
     this.socket = io(server, {
-      transports: ['polling', 'websocket'],
+      transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: 10,
       reconnectionDelay: 3000,
